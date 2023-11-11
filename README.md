@@ -1,34 +1,15 @@
-# Nix
+# Nix Pretty Repl
+A fork simply for the purpose of adding pretty printing to the Repl (`:pp`). It is based on [nixfmt-flib](https://github.com/MathiasSven/nixfmt-flib), a fork of [nixfmt](https://github.com/serokell/nixfmt) that adds FFI and some (not so pretty) changes to make sure no functionality is lost in the Repl such as color codes and unshowable expressions such as `«derivation ...»`.
 
-[![Open Collective supporters](https://opencollective.com/nixos/tiers/supporter/badge.svg?label=Supporters&color=brightgreen)](https://opencollective.com/nixos)
-[![Test](https://github.com/NixOS/nix/workflows/Test/badge.svg)](https://github.com/NixOS/nix/actions)
+The default package has been changed to:
+```nix
+writeScriptBin "nix-repl" ''
+  ${nix} repl $@
+'';
+```
 
-Nix is a powerful package manager for Linux and other Unix systems that makes package
-management reliable and reproducible. Please refer to the [Nix manual](https://nixos.org/nix/manual)
-for more details.
+This fork also enables `ReplFlake` by default (C/P from [this](https://github.com/privatevoid-net/nix-super/commit/cb263a33b9a14c8e99018af663e02b95e66659bd) commit). So this should be a streight replacement to the normal `nix repl`
 
-## Installation and first steps
+## Note
 
-Visit [nix.dev](https://nix.dev) for [installation instructions](https://nix.dev/tutorials/install-nix) and [beginner tutorials](https://nix.dev/tutorials/first-steps).
-
-Full reference documentation can be found in the [Nix manual](https://nixos.org/nix/manual).
-
-## Building And Developing
-
-See our [Hacking guide](https://nixos.org/manual/nix/unstable/contributing/hacking.html) in our manual for instruction on how to
- set up a development environment and build Nix from source.
-
-## Contributing
-
-Check the [contributing guide](./CONTRIBUTING.md) if you want to get involved with developing Nix.
-
-## Additional Resources
-
-- [Nix manual](https://nixos.org/nix/manual)
-- [Nix jobsets on hydra.nixos.org](https://hydra.nixos.org/project/nix)
-- [NixOS Discourse](https://discourse.nixos.org/)
-- [Matrix - #nix:nixos.org](https://matrix.to/#/#nix:nixos.org)
-
-## License
-
-Nix is released under the [LGPL v2.1](./COPYING).
+Obviously this is super inefficient, as in you download and build a whole different clone just to use `nix repl`, but for me it is simpler to use it like this vs figuring out how to decouple the repl from the rest.

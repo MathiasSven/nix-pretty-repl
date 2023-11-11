@@ -8,7 +8,9 @@
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat }:
+  inputs.nixfmt-flib.url = "github:MathiasSven/nixfmt-flib";
+
+  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat, nixfmt-flib }:
 
     let
       inherit (nixpkgs) lib;
@@ -197,6 +199,8 @@
             boost
             lowdown-nix
             libsodium
+            nixfmt-flib.packages.${system}.nixfmt-flib
+            nixfmt-flib.packages.${system}.ghc-from-c
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
@@ -670,8 +674,10 @@
       });
 
       packages = forAllSystems (system: rec {
-        inherit (nixpkgsFor.${system}.native) nix;
-        default = nix;
+        inherit (nixpkgsFor.${system}.native) nix writeScriptBin;
+        default = writeScriptBin "nix-repl" ''
+          ${nix}/bin/nix repl $@
+        '';
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = nixpkgsFor.${system}.static.nix;
         dockerImage =

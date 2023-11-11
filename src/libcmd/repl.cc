@@ -2,6 +2,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <climits>
+#include <locale>
+#include <codecvt>
 
 #include <setjmp.h>
 
@@ -45,6 +47,8 @@ extern "C" {
 #include "local-fs-store.hh"
 #include "progress-bar.hh"
 #include "print.hh"
+
+#include "Nixfmt_stub.h"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -95,8 +99,9 @@ struct NixRepl
     void loadDebugTraceEnv(DebugTrace & dt);
 
     typedef std::set<Value *> ValuesSeen;
-    std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth);
-    std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
+    bool prettyPrint;
+    std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth, bool prettyPrint = false);
+    std::ostream & _printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
 };
 
 std::string removeWhitespace(std::string s)
@@ -115,6 +120,7 @@ NixRepl::NixRepl(const SearchPath & searchPath, nix::ref<Store> store, ref<EvalS
     , getValues(getValues)
     , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
+    , prettyPrint(false)
 {
 }
 
@@ -238,6 +244,7 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
 
 void NixRepl::mainLoop()
 {
+    hs_init(0, 0);
     std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
 
@@ -307,6 +314,7 @@ void NixRepl::mainLoop()
         input.clear();
         std::cout << std::endl;
     }
+    hs_exit();
 }
 
 
@@ -503,6 +511,8 @@ bool NixRepl::processLine(std::string line)
              << "  :l, :load <path>             Load Nix expression and add it to scope\n"
              << "  :lf, :load-flake <ref>       Load Nix flake and add it to scope\n"
              << "  :p, :print <expr>            Evaluate and print expression recursively\n"
+             << "  :pp, :pretty-print <expr>    Evaluate and pretty print expression recursively\n"
+             << "  :ppt, :pprint-toggle [bool]  Enable, disable or toggle pretty printing\n"
              << "  :q, :quit                    Exit nix-repl\n"
              << "  :r, :reload                  Reload all files\n"
              << "  :sh <expr>                   Build dependencies of derivation, then start\n"
@@ -713,6 +723,30 @@ bool NixRepl::processLine(std::string line)
         printValue(std::cout, v, 1000000000) << std::endl;
     }
 
+    else if (command == ":pp" || command == ":pprint") {
+        Value v;
+        evalString(arg, v);
+        printValue(std::cout, v, 1, true) << std::endl;
+    }
+
+    else if (command == ":ppp" || command == ":ppprint") {
+        Value v;
+        evalString(arg, v);
+        printValue(std::cout, v, 1000000000, true) << std::endl;
+    }
+
+    else if (command == ":ppt" || command == ":pprint-toggle") {
+        if (arg == "false" || (arg == "" && NixRepl::prettyPrint)) {
+            std::cout << "not pretty printing\n";
+            NixRepl::prettyPrint = false;
+        } else if (arg == "true" || (arg == "" && !NixRepl::prettyPrint)) {
+            std::cout << "pretty printing\n";
+            NixRepl::prettyPrint = true;
+        } else {
+            throw Error("unexpected argument '%s' to %s", arg, command);
+        };
+    }
+
     else if (command == ":q" || command == ":quit") {
         state->debugStop = false;
         state->debugQuit = true;
@@ -894,17 +928,45 @@ void NixRepl::evalString(std::string s, Value & v)
 }
 
 
-std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth)
+std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth, bool prettyPrint)
 {
     ValuesSeen seen;
-    return printValue(str, v, maxDepth, seen);
+
+    if (NixRepl::prettyPrint || prettyPrint) {
+        std::ostringstream oss;
+
+        _printValue(oss, v, maxDepth, seen);
+
+        std::string text;
+        text = filterANSIEscapes(oss.str(), true);
+
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+        std::wstring wstr = converter.from_bytes(text);
+
+        // Inputs are weird, hack to remove the responsible characters
+        std::wstring res;
+        for(u_long i = 0; i < wstr.length(); ++i)
+        {
+            if(wstr[i] >= L' ')
+                res.push_back(wstr[i]);
+        }
+
+        str.flush();
+        str << converter.to_bytes(static_cast<const wchar_t*>(fformat(res.data())));
+        return str;
+
+    } else {
+
+        return _printValue(str, v, maxDepth, seen);
+    };
+
 }
 
 
 
 
 // FIXME: lot of cut&paste from Nix's eval.cc.
-std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen)
+std::ostream & NixRepl::_printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen)
 {
     str.flush();
     checkInterrupt();
@@ -968,7 +1030,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                     str << "«repeated»";
                 else
                     try {
-                        printValue(str, *i.second, maxDepth - 1, seen);
+                        _printValue(str, *i.second, maxDepth - 1, seen);
                     } catch (AssertionError & e) {
                         str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
                     }
@@ -992,7 +1054,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                     str << "«repeated»";
                 else
                     try {
-                        printValue(str, *elem, maxDepth - 1, seen);
+                        _printValue(str, *elem, maxDepth - 1, seen);
                     } catch (AssertionError & e) {
                         str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
                     }

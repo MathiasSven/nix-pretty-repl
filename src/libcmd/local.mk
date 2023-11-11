@@ -8,7 +8,10 @@ libcmd_SOURCES := $(wildcard $(d)/*.cc)
 
 libcmd_CXXFLAGS += -I src/libutil -I src/libstore -I src/libexpr -I src/libmain -I src/libfetchers
 
-libcmd_LDFLAGS = $(EDITLINE_LIBS) $(LOWDOWN_LIBS) -pthread
+libcmd_LDFLAGS = $(EDITLINE_LIBS) $(LOWDOWN_LIBS) -pthread -lHSrts-ghc9.4.6 -lnixfmt-flib
+
+# for nixfmt-flib
+libcmd_LDFLAGS += -lHSrts-ghc9.4.6 -lnixfmt-flib
 
 libcmd_LIBS = libstore libutil libexpr libmain libfetchers
 

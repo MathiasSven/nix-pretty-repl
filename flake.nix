@@ -159,6 +159,7 @@
           lib.optionals stdenv.isLinux [
             "--with-boost=${boost}/lib"
             "--with-sandbox-shell=${sh}/bin/busybox"
+            (lib.withFeatureAs true "readline-flavor" "readline")
           ]
           ++ lib.optionals (stdenv.isLinux && !(isStatic && stdenv.system == "aarch64-linux")) [
             "LDFLAGS=-fuse-ld=gold"
@@ -193,7 +194,7 @@
 
         buildDeps =
           [ curl
-            bzip2 xz brotli editline
+            bzip2 xz brotli
             openssl sqlite
             libarchive
             boost
@@ -201,6 +202,7 @@
             libsodium
             nixfmt-flib.packages.${system}.nixfmt-flib
             nixfmt-flib.packages.${system}.ghc-from-c
+            readline
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;

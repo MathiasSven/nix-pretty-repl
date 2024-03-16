@@ -1,4 +1,9 @@
 # Nix Pretty Repl
+
+*This is potentially deprecated, since as of Nix 2.21 pretty [printing is builtin](https://github.com/NixOS/nix/pull/9931)*
+
+---
+
 A fork simply for the purpose of adding pretty printing to the Repl (`:pp`). It is based on [nixfmt-flib](https://github.com/MathiasSven/nixfmt-flib), a fork of [nixfmt](https://github.com/serokell/nixfmt) that adds FFI and some (not so pretty) changes to make sure no functionality is lost in the Repl such as color codes and unshowable expressions such as `«derivation ...»`.
 
 The default package has been changed to:
